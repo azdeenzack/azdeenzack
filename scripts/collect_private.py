@@ -4,11 +4,15 @@ import os
 import pathlib
 import sys
 import urllib.request
+import urllib.error
 
 OWNER = "azdeenzack"
 QUERY = '''query($cursor:String) { viewer { login repositories(first:100,after:$cursor,ownerAffiliations:[OWNER],privacy:PRIVATE) { nodes { databaseId visibility isFork primaryLanguage { name color } } pageInfo { hasNextPage endCursor } } } }'''
 
 class CollectionFailure(Exception):
+    pass
+
+class ApiRejected(CollectionFailure):
     pass
 
 def merge(snapshot, fetch):
@@ -18,8 +22,10 @@ def merge(snapshot, fetch):
     cursors = set()
     while True:
         response = fetch(cursor)
-        if not isinstance(response, dict) or response.get('errors'):
+        if not isinstance(response, dict):
             raise CollectionFailure()
+        if response.get('errors'):
+            raise ApiRejected()
         viewer = response['data']['viewer']
         if viewer['login'].lower() != OWNER:
             raise CollectionFailure()
@@ -85,7 +91,13 @@ def main():
 if __name__=='__main__':
     try:
         sys.exit(main())
-    except Exception:
-        # Neither exception object nor response/URL/metadata enters public logs.
+    except urllib.error.HTTPError as error:
+        # Fixed numeric classifications only. Never disclose payload, URL or exception.
+        sys.exit({401:11,403:12,429:13}.get(error.code,14))
+    except ApiRejected:
+        sys.exit(20)
+    except CollectionFailure:
         sys.stderr.write('Private metadata collection failed. No data published.\n')
         sys.exit(1)
+    except Exception:
+        sys.exit(22)
