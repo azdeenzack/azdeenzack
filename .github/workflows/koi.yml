@@ -1,5 +1,5 @@
+# Self-owned source pinned from git-koi v1.0.2. Private metadata never enters logs.
 name: Koi
-
 on:
   schedule:
     - cron: '20 0 * * *'
@@ -7,34 +7,72 @@ on:
   push:
     paths:
       - .github/workflows/koi.yml
-
 permissions:
   contents: write
-
 concurrency:
   group: koi
   cancel-in-progress: false
-
 jobs:
   koi:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: yalongwastaken/git-koi@7305e9b1fadee6f43d3b4fa543a25d4cde79856e # v1.0.2
-        with:
-          login: azdeenzack
-          body: white
-          output-dir: koi
-      - name: Commit the koi if it changed
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Build owned renderer without private credentials
         shell: bash
         run: |
-          git add koi/koi.gif
-          if git diff --cached --quiet; then
-            echo "The koi is unchanged; nothing to commit."
-            exit 0
+          set -euo pipefail
+          rustup toolchain install 1.88.0 --profile minimal
+          rustup run 1.88.0 cargo test --release --locked --manifest-path vendor/git-koi/Cargo.toml
+          rustup run 1.88.0 cargo build --release --locked --manifest-path vendor/git-koi/Cargo.toml --bins
+          python3 -m unittest discover -s scripts -p 'test_collect_private.py'
+      - name: Collect public activity
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          umask 077
+          vendor/git-koi/target/release/git-koi collect azdeenzack --output "$RUNNER_TEMP/koi-public.json"
+      - name: Collect private metadata without public output
+        shell: bash
+        env:
+          KOI_PRIVATE_METADATA_TOKEN: ${{ secrets.KOI_PRIVATE_METADATA_TOKEN }}
+        run: |
+          set +x
+          set -euo pipefail
+          umask 077
+          ulimit -c 0
+          if ! python3 scripts/collect_private.py "$RUNNER_TEMP/koi-public.json" "$RUNNER_TEMP/koi-private.json" >/dev/null 2>&1; then
+            echo 'Private metadata collection failed. No data published.'
+            exit 1
           fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - name: Render without private credentials
+        shell: bash
+        run: |
+          set +x
+          set -euo pipefail
+          umask 077
+          ulimit -c 0
+          if ! env -i PATH="$PATH" vendor/git-koi/target/release/private-koi render "$RUNNER_TEMP/koi-private.json" --output-dir "$RUNNER_TEMP/koi-render" --body white >/dev/null 2>&1; then
+            echo 'Koi rendering failed. No data published.'
+            exit 1
+          fi
+          mkdir -p koi
+          cp "$RUNNER_TEMP/koi-render/koi.gif" koi/koi.gif
+      - name: Remove temporary data
+        if: always()
+        shell: bash
+        run: |
+          rm -f "$RUNNER_TEMP/koi-public.json" "$RUNNER_TEMP/koi-private.json"
+          rm -rf "$RUNNER_TEMP/koi-render"
+      - name: Publish only the image
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add -- koi/koi.gif
+          if git diff --cached --quiet; then exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git commit --quiet --message "koi: draw the day's koi"
           git push --quiet
