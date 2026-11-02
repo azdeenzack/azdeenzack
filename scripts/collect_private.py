@@ -47,7 +47,9 @@ def merge(snapshot, fetch):
                 name, color = language['name'], language['color']
                 if not isinstance(name,str) or len(name)>100 or (color is not None and (not isinstance(color,str) or len(color)!=7 or color[0]!='#' or any(c not in '0123456789abcdefABCDEF' for c in color[1:]))):
                     raise CollectionFailure(36)
+                color = color.lower() if color is not None else None
                 existing = result['language_colors'].get(name, color)
+                existing = existing.lower() if isinstance(existing, str) else existing
                 if existing != color:
                     raise CollectionFailure(37)
                 result['language_colors'][name] = color
