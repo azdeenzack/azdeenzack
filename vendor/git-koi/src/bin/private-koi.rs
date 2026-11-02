@@ -11,7 +11,7 @@ use git_koi::coat::KoiBody;
 use git_koi::collect::{GhCli, collect_account_snapshot};
 use git_koi::history::AccountSnapshot;
 use git_koi::motion::frame_count;
-use git_koi::output::{encode_gif, encode_png, encode_preview_html};
+use git_koi::output::{encode_gif_cropped, encode_png, encode_preview_html};
 use git_koi::render::{KoiFrame, render_koi, render_swim_frame};
 
 const USAGE: &str = "Usage: git-koi collect LOGIN [--output FILE]
@@ -149,7 +149,7 @@ fn render_day(snapshot_path: &Path, koi_body: KoiBody) -> Result<RenderedDay, St
         .map(|frame_index| render_swim_frame(&koi_development, koi_body, behavior, frame_index))
         .collect();
     let gif_bytes =
-        encode_gif(&swim_frames).map_err(|encoding_error| encoding_error.to_string())?;
+        encode_gif_cropped(&swim_frames).map_err(|encoding_error| encoding_error.to_string())?;
     let png_bytes = encode_png(&render_koi(&koi_development, koi_body))
         .map_err(|encoding_error| encoding_error.to_string())?;
     let caption = format!(
