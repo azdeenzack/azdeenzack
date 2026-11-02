@@ -8,7 +8,13 @@ def node(rid=1,visibility='PRIVATE'):
  return {'databaseId':rid,'visibility':visibility,'isFork':False,'primaryLanguage':{'name':'Python','color':'#3572A5'}}
 class Tests(unittest.TestCase):
  def test_merge(self):
-  b=copy.deepcopy(BASE);out=merge(b,lambda _:response([node()]));self.assertEqual(b,BASE);self.assertEqual(out['repositories'][0]['visibility'],'private');self.assertEqual(out['language_colors'],{'Python':'#3572A5'})
+  b=copy.deepcopy(BASE);out=merge(b,lambda _:response([node()]));self.assertEqual(b,BASE);self.assertEqual(out['repositories'][0]['visibility'],'private');self.assertEqual(out['language_colors'],{'Python':'#3572a5'})
+ def test_matching_color_case_is_normalized(self):
+  b=copy.deepcopy(BASE);b['language_colors']={'Python':'#3572a5'}
+  out=merge(b,lambda _:response([node()]));self.assertEqual(out['language_colors']['Python'],'#3572a5')
+ def test_conflicting_color_still_rejected(self):
+  b=copy.deepcopy(BASE);b['language_colors']={'Python':'#000000'}
+  with self.assertRaises(CollectionFailure):merge(b,lambda _:response([node()]))
  def test_pagination(self):
   out=merge(BASE,lambda c:response([node(1)],True,'next') if c is None else response([node(2)]));self.assertEqual(len(out['repositories']),2)
  def test_wrong_owner(self):
