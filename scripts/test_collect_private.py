@@ -25,5 +25,5 @@ class Tests(unittest.TestCase):
   self.assertNotIn('nameWithOwner',QUERY);self.assertNotIn('description',QUERY);self.assertNotIn('object(',QUERY);self.assertIn('ownerAffiliations:[OWNER]',QUERY)
  def test_no_secret_in_error(self):
   p=subprocess.run([sys.executable,str(pathlib.Path(__file__).with_name('collect_private.py'))],capture_output=True,text=True,env={'KOI_PRIVATE_METADATA_TOKEN':'TEST_SECRET_NOT_REAL'})
-  self.assertEqual(p.returncode,1);self.assertEqual(p.stdout,'');self.assertEqual(p.stderr,'Private metadata collection failed. No data published.\n')
+  self.assertEqual(p.returncode,40);self.assertEqual(p.stdout,'');self.assertEqual(p.stderr,'Private metadata collection failed. No data published.\n')
 if __name__=='__main__':unittest.main()
